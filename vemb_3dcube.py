@@ -164,4 +164,4 @@ def emb_potential(elec=True,non_k = True,non_xc = True):
             write_cc(vemb_tot,outfile = 'emb_xc.cube') 
         else:
             print("Define the embedding potentail")
-            
+emb_potential(elec=True,non_k = True,non_xc = True)         
