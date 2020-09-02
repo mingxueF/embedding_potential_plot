@@ -1,9 +1,8 @@
 import numpy as np
 from pyscf.tools import cubegen
 from pyscf.dft import gen_grid
-from taco.embedding.pyscf_wrap import get_charges_and_coords
-from taco.embedding.pyscf_wrap_single import get_density_from_dm, get_dft_grid_stuff
-from taco.embedding.cc_gridfns import coulomb_potential_grid
+from taco.embedding.pyscf_embpot import get_charges_and_coords
+from taco.embedding.pyscf_wrap_single import get_coulomb_repulsion,get_density_from_dm, get_dft_grid_stuff
 
 #
 #def cube_gen(mol,nx,ny,nz,margin=5):
@@ -41,7 +40,7 @@ def get_elec(mol_tot,mol_A,mol_B,dmA,dmB,points):
     # Grid for plot
     rho0,rho1,rho_both = get_density(mol_A,mol_B,dmA,dmB,points)
     # Coulomb repulsion potential
-    v_coul = coulomb_potential_grid(points, grids.coords, grids.weights, rho1_grid)
+    v_coul = get_coulomb_repulsion(mol_B,dmB,points)
     # Nuclear-electron attraction potential
     mol1_charges, mol1_coords = get_charges_and_coords(mol_B)
     v1_nuc0 = np.zeros(rho0.shape)
