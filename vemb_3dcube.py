@@ -43,50 +43,23 @@ system = gto.M(atom=newatom, basis=basis)
 #dmB = wrap.method1.get_density()
 dmA = np.load("dm0_fromSCF.npy")
 dmB = np.load("dm1_fromSCF.npy")    
-# option2--import the density matric from outside
-#basis_A = A_mol.nao_nr()     # the number of AO
-#basis_B = B_mol.nao_nr()
-#basis_AB = basis_A + basis_B 
-#dmA_fde_mp2 = np.loadtxt("/home/fu/code/taco_public/examples/embedding/glycine_h2o/3.154/FDE_State0_tot_dens.txt",\
-#                 max_rows=basis_A*basis_A).reshape(basis_A,basis_A)
-#dmB_fde_mp2 = np.loadtxt("/home/fu/code/taco_public/examples/embedding/glycine_h2o/3.154/State_mp2_gs_B.txt",\
-#                 max_rows=basis_B*basis_B).reshape(basis_B,basis_B)
-#dmAB_mp2 = np.loadtxt("/home/fu/code/taco_public/examples/embedding/glycine_h2o/3.154/Densmat_MP.txt",\
-#                 max_rows=basis_AB*basis_AB).reshape(basis_AB,basis_AB)
-def emb_potential(mol, nx=80, ny=80, nz=80,option = 1,outfile="emb.cube"):
-    """Calculates the embedding potential and write out in
-    cube format.
 
-    Args:
-        mol : Mole
-            Molecule to calculate the electron density for.
-        outfile : str
-            Name of Cube file to be written.
-
-    Kwargs:
-        nx : int
-            Number of grid point divisions in x direction.
-            Note this is function of the molecule's size; a larger molecule
-            will have a coarser representation than a smaller one for the
-            same value. Conflicts to keyword resolution.
-        ny : int
-            Number of grid point divisions in y direction.
-        nz : int
-            Number of grid point divisions in z direction.
-        option: int
-             1: the complete embedding potential(default)
-             0: only electrostatic part
+cc = cubegen.Cube(system, nx=80, ny=80, nz=80,margin=5)
+points = cc.get_coords()
+# Grid for plot
+rho0 = get_density_from_dm(wrap.mol0, dmA, points)
+rho1 = get_density_from_dm(wrap.mol1, dmB, points)
+rho_both = rho0 + rho1
+def get_elec(dmA,dmB):
     """
-    cc = cubegen.Cube(mol, nx, ny, nz,margin=5)
-
-    points = cc.get_coords()
+    Args:
+        dmA/dmB: 2D array
+            density matrix, size of (ao,ao). 
+            ao is the number of atomic orbitals
+    """
     grids = gen_grid.Grids(system)
     grids.level = 4
     grids.build()
-    # Grid for plot
-    rho0 = get_density_from_dm(wrap.mol0, dmA, points)
-    rho1 = get_density_from_dm(wrap.mol1, dmB, points)
-    rho_both = rho0 + rho1
     rho1_grid = get_density_from_dm(wrap.mol1, dmB, grids.coords)
     # write the electron density to a cube file    
     rho = rho_both.reshape(cc.nx,cc.ny,cc.nz)
@@ -101,22 +74,94 @@ def emb_potential(mol, nx=80, ny=80, nz=80,option = 1,outfile="emb.cube"):
             d = np.linalg.norm(point-mol1_coords[i])
             if d >= 1e-5:
                 v1_nuc0[j] += - mol1_charges[i]/d 
-    # DFT nad potential
-    excs, vxcs = get_dft_grid_stuff(xc_code, rho_both, rho0, rho1)
+    v_elec = v_coul + v1_nuc0
+    return v_elec
+    
+def get_vT(xc_code,rho_both,rho0,rho1):
+    """
+    Args:
+        xc_code: string
+            see Pyscf instructions
+        rho0/rho1: 1D array
+            size of N (number of points)
+        
+    """
     ets, vts = get_dft_grid_stuff(t_code, rho_both, rho0, rho1)
-    vxc_emb = vxcs[0][0] - vxcs[1][0]-vxcs[2][0]
     vt_emb = vts[0][0] - vts[1][0]- vts[2][0] 
-    if option == 1:
-        vemb_tot = v_coul + v1_nuc0 + vxc_emb + vt_emb
-        vemb_tot = vemb_tot.reshape(cc.nx,cc.ny,cc.nz)
-        outfile = 'emb.cube'
-        # Write the potential
-        cc.write(vemb_tot, outfile, 'Molecular embedding electrostatic potential in real space')
-    else:
-        vemb_tot = v_coul + v1_nuc0
-        vemb_tot = vemb_tot.reshape(cc.nx,cc.ny,cc.nz)
-        outfile = 'emb_elec.cube'
-        # Write the potential
-        cc.write(vemb_tot, outfile, 'Molecular embedding electrostatic potential in real space')
-    return vemb_tot
-emb_potential(mol=system,nx=20,ny=20,nz=20)
+    return vt_emb
+
+def get_vXC(xc_code,rho_both,rho0,rho1):
+    """
+    Args:
+        xc_code: string
+            see Pyscf instructions
+        rho0/rho1: 1D array
+            size of N (number of points)
+        
+    """
+    excs, vxcs = get_dft_grid_stuff(xc_code, rho_both, rho0, rho1)
+    vxc_emb = vxcs[0][0] - vxcs[1][0]-vxcs[2][0]
+    return vxc_emb
+
+def write_cc(vemb_tot,outfile='emb.cube'):
+    """    
+    Args:
+        vemb_tot: 1D array
+            size of N
+    Kwargs:
+        outfile: the file name
+        nx : int
+            Number of grid point divisions in x direction.
+            Note this is function of the molecule's size; a larger molecule
+            will have a coarser representation than a smaller one for the
+            same value. Conflicts to keyword resolution.
+        ny : int
+            Number of grid point divisions in y direction.
+        nz : int
+            Number of grid point divisions in z direction.
+            """
+    vemb_tot = vemb_tot.reshape(cc.nx,cc.ny,cc.nz)
+    outfile = 'emb.cube'
+    # Write the potential
+    cc.write(vemb_tot, outfile, 'Molecular embedding potential in real space')
+
+def emb_potential(elec=True,non_k = True,non_xc = True):
+    """Calculates the embedding potential and write out in
+    cube format.
+
+    """
+    if elec == True:        
+        v_elec = get_elec(dmA,dmB)
+        if non_k == True and non_xc == True:
+            vxc_emb = get_vXC(xc_code,rho_both,rho0,rho1)
+            vt_emb = get_vT(xc_code,rho_both,rho0,rho1)
+            vemb_tot = v_elec + vxc_emb + vt_emb
+            write_cc(vemb_tot,outfile = 'emb.cube') 
+        elif non_k == True and non_xc == False:
+            vt_emb = get_vT(xc_code,rho_both,rho0,rho1)
+            vemb_tot = v_elec + vt_emb
+            write_cc(vemb_tot,outfile = 'emb_k.cube') 
+        elif non_k == False and non_xc == True:
+            vxc_emb = get_vXC(xc_code,rho_both,rho0,rho1)
+            vemb_tot = v_elec + vt_emb
+            write_cc(vemb_tot,outfile = 'emb_xc.cube') 
+        else:
+            vemb_tot = v_elec
+            write_cc(vemb_tot,outfile = 'emb_elec.cube')
+    if elec == False:
+        if non_k == True and non_xc == True:
+            vxc_emb = get_vXC(xc_code,rho_both,rho0,rho1)
+            vt_emb = get_vT(xc_code,rho_both,rho0,rho1)
+            vemb_tot = vxc_emb + vt_emb
+            write_cc(vemb_tot,outfile = 'emb.cube') 
+        elif non_k == True and non_xc == False:
+            vt_emb = get_vT(xc_code,rho_both,rho0,rho1)
+            vemb_tot = vt_emb
+            write_cc(vemb_tot,outfile = 'emb_k.cube') 
+        elif non_k == False and non_xc == True:
+            vxc_emb = get_vXC(xc_code,rho_both,rho0,rho1)
+            vemb_tot = vt_emb
+            write_cc(vemb_tot,outfile = 'emb_xc.cube') 
+        else:
+            print("Define the embedding potentail")
+emb_potential(elec=True,non_k = True,non_xc = True)         
