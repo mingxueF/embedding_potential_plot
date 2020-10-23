@@ -47,4 +47,4 @@ for i in range(mol0.natm):
 atoms0 = np.array(atoms0, dtype=int)
 print(atoms0)
 dm_ref = reorder_matrix(dm, 'qchem', 'pyscf', basis_str, atoms0)
-np.save('dmB_mp2',dm)
+np.save('dmB_mp2',dm_ref)
