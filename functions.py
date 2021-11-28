@@ -96,21 +96,21 @@ def emb_potential(points,mola,dma,molb,dmb,xc_code='Slater,VWN5',t_code='LDA_K_T
 
     """
     if elec == True:        
-        v_elec = functions.get_elec(system,mola,molb,dmA,dmB,points)
+        v_elec = get_elec(system,mola,molb,dmA,dmB,points)
         print(v_elec)
         if non_k == True and non_xc == True:
-            rho0,rho1,rho_both = functions.get_density(mola,molb,dmA,dmB,points)
+            rho0,rho1,rho_both = get_density(mola,molb,dmA,dmB,points)
             print(rho_both)
-            vxc_emb = functions.get_vXC(rho0,rho1,rho_both,xc_code)
-            vt_emb = functions.get_vT(rho0,rho1,rho_both,t_code)
+            vxc_emb = get_vXC(rho0,rho1,rho_both,xc_code)
+            vt_emb = get_vT(rho0,rho1,rho_both,t_code)
             vemb_tot = v_elec + vxc_emb + vt_emb
             vemb_tot = vemb_tot.reshape(cc.nx,cc.ny,cc.nz)
             cc.write(vemb_tot,'emb_full_pot.cube','Molecular embedding potential in real space')
            # functions.write_cc(vemb_tot,cc.nx,cc.ny,cc.nz,outfile = 'emb.cube') 
         elif non_k == True and non_xc == False:
-            vt_emb = functions.get_vT(rho0,rho1,rho_both,t_code)
+            vt_emb = get_vT(rho0,rho1,rho_both,t_code)
             vemb_tot = v_elec + vt_emb
-            functions.write_cc(vemb_tot,outfile = 'emb_k.cube') 
+            #write_cc(vemb_tot,outfile = 'emb_k.cube') 
         elif non_k == False and non_xc == True:
             vxc_emb = functions.get_vXC(rho0,rho1,rho_both,xc_code)
             vemb_tot = v_elec + vt_emb
