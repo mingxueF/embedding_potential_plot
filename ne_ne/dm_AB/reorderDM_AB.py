@@ -19,12 +19,11 @@ from taco.translate.tools import reorder_matrix
 
 home = '/Users/mingxue/code/kernel_scripts'
 basisfiles = home+'/basis/'
-basis_str = 'aug-cc-pVDZ'
+basis_str = 'aug-cc-pV5Z'
 root = os.getcwd()
 zr_file = ccj.find_file(root,extension="zr")
 frags = ccj.zr_frag(zr_file)
-dm_file = 'FDE_State0_tot_dens.txt'
-#dm_file = 'B_MP.txt'
+dm_file = 'Densmat_MP.txt'
 # =============================================================================
 #load DM
 dm = np.loadtxt(os.path.join(root, dm_file))
@@ -35,16 +34,21 @@ dm = dm[:mid0]
 # Define Molecules with QCElemental
 with open(os.path.join(basisfiles, basis_str+'.nwchem'), 'r') as bf:
     ibasis = bf.read()    
-mol0 = gto.M(atom=frags['B'], basis=ibasis)
+mol0 = gto.M(atom=frags['A'], basis=ibasis)
+mol1 = gto.M(atom=frags['B'],basis= ibasis)
 nao_mol0 = mol0.nao_nr()
+nao_mol1 = mol1.nao_nr()
 print("AOs tot = ", nao_mol0)
 # Reshape the density matrix
-dm = 2.0*dm.reshape((nao_mol0, nao_mol0))
+dm = 2.0*dm.reshape((nao_mol0+nao_mol1, nao_mol0+nao_mol1))
 # Order from qchem to pyscf
-atoms0 = []
+atoms = []
 for i in range(mol0.natm):
-    atoms0.append(int(mol0._atm[i][0])) #check mol._atm
-atoms0 = np.array(atoms0, dtype=int)
-print(atoms0)
-dm_ref = reorder_matrix(dm, 'qchem', 'pyscf', basis_str, atoms0)
-np.save('dmB_mp2',dm_ref)
+    atoms.append(int(mol0._atm[i][0])) #check mol._atm
+print(atoms)
+for j in range(mol1.natm):
+    atoms.append(int(mol1._atm[j][0]))
+atoms = np.array(atoms, dtype=int)
+print(atoms)
+dm_ref = reorder_matrix(dm, 'qchem', 'pyscf', basis_str, atoms)
+np.save(basis_str+'mp2',dm)
